@@ -54,6 +54,35 @@ run_pipeline_predict80(csv_path="다른파일.csv", out_path="output.csv", use_h
 ### 4. 종합 학습/평가 루틴
 `run_pipeline()`은 데이터 전처리 후 train/test 분할로 두 타겟을 순차 평가하고, 샘플 비교 및 리포트를 출력합니다.
 
+## 모델 저장 및 외부 데이터 예측
+`model_manager.py`는 학습된 랜덤 포레스트 모델을 디스크에 저장하고, 이후 외부 CSV에 대해 동일 파이프라인으로 예측할 수 있는 유틸리티입니다.
+
+### 1) 모델 학습 & 저장
+```bash
+python model_manager.py init \
+    --original-csv 기업신용평가정보_합성데이터.csv \
+    --model-path artifacts/rf_credit_models.joblib \
+    --predictions-path predictions_80.csv
+```
+- 내부적으로 `run_pipeline_predict80`을 실행해 20/80 리포트를 `predictions_80.csv`에 저장합니다.
+- 전체 데이터를 다시 학습하여 두 개의 RandomForest 모델(타겟1/타겟2)을 `artifacts/rf_credit_models.joblib`에 직렬화합니다.
+- `--no-hybrid` 플래그를 주면 규칙 기반 점수를 결합하지 않은 ML 단독 모델을 저장합니다.
+- `--use-cuml` 옵션으로 GPU 환경(cuML)을 사용할 수도 있습니다.
+
+### 2) 외부 데이터 예측
+```bash
+python model_manager.py predict \
+    --input-csv 외부데이터.csv \
+    --model-path artifacts/rf_credit_models.joblib \
+    --output-csv external_predictions.csv
+```
+- 입력 CSV는 학습 데이터와 동일한 스키마가 되도록 `load_dataframe.load_by_data_fields()`가 자동 보정합니다.
+- 저장된 메타데이터에 따라 필요 컬럼 순서를 맞추고 누락 컬럼은 0으로 채웁니다.
+- 결과 CSV(`external_predictions.csv`)에는 타겟별 ML 예측 열이 추가되며, 하이브리드 모드로 학습했다면 규칙 기반 결합 결과도 포함됩니다.
+- `--output-csv` 를 생략하면 DataFrame만 출력합니다(콘솔에서 미리보기 가능).
+
+> **Tip**: 새 모델을 학습할 때마다 `artifacts/` 디렉터리가 자동 생성됩니다. 대용량 파일이므로 필요 시 `.gitignore`에 추가해 Git 추적 대상에서 제외하세요.
+
 ## 출력물 설명
 - `predictions_80.csv`
   - 인덱스 `원본CSV행번호` : 원본 CSV에서의 실제 행 번호(헤더 기준 +2)
