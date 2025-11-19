@@ -2,3 +2,4 @@
 *.xlsx
 *.joblib
 predictions_80.csv
+entry_conditions_check.md
